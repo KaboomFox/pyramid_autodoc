@@ -91,7 +91,9 @@ class RouteDirective(Directive):
             route_node.append(real_table)
 
             if mapped_route['docs']:
-                route_node += rst2node(mapped_route['docs'])
+                route_node += rst2node(
+                    mapped_route['view'], mapped_route['docs']
+                )
 
             custom_nodes.append(route_node)
 
@@ -138,13 +140,13 @@ class Env(object):
     docname = ''
 
 
-def rst2node(data):
+def rst2node(doc_name, data):
     """Converts a reStructuredText into its node
     """
     if not data:
         return
     parser = docutils.parsers.rst.Parser()
-    document = docutils.utils.new_document('<>')
+    document = docutils.utils.new_document('<%s>' % doc_name)
     document.settings = docutils.frontend.OptionParser().get_default_values()
     document.settings.tab_width = 4
     document.settings.pep_references = False
