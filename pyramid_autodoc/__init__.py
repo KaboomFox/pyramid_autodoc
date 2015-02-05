@@ -65,10 +65,30 @@ class RouteDirective(Directive):
             route_id = "route-%d" % env.new_serialno('route')
             route_node = nodes.section(ids=[route_id])
             title = mapped_route['pattern']
-            subtitle = mapped_route['view']
 
             route_node += nodes.title(text=title)
-            route_node += nodes.subtitle(text=subtitle)
+
+            real_table = nodes.table('')
+            group = nodes.tgroup('', cols=2)
+            real_table += group
+            group += nodes.colspec('', colwidth=10)
+            group += nodes.colspec('', colwidth=90)
+            body = nodes.tbody('')
+            group += body
+
+            def get_row(*column_texts):
+                row = nodes.row('')
+                for text in column_texts:
+                    node = nodes.paragraph('', '', nodes.Text(text))
+                    row += nodes.entry('', node)
+
+                return row
+
+            body += get_row('Module', mapped_route['view'])
+            body += get_row('Request Method', mapped_route['method'])
+            body += get_row('Route Name', mapped_route['name'])
+
+            route_node.append(real_table)
 
             if mapped_route['docs']:
                 route_node += rst2node(mapped_route['docs'])
