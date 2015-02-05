@@ -1,2 +1,3 @@
-# pyramid_autodoc
+pyramid_autodoc
+--------------------------------
 Sphinx extension for documenting your Pyramid APIs.
