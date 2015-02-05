@@ -1,6 +1,14 @@
 CHANGES
 =======
 
+0.0.3
+-----
+
+* Improved the release script
+* Bump version
+* Add the view name to the rst node when errors are thrown
+* Added changelog and authors
+
 0.0.2
 -----
 
