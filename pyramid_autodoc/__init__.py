@@ -109,7 +109,7 @@ class RouteDirective(Directive):
             for line in directives:
                 result.append(line, '<autopyramid>')
 
-            nested_parse_with_titles(self.state, result, node)
+        nested_parse_with_titles(self.state, result, node)
 
         return node.children
 
