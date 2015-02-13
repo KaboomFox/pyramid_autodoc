@@ -38,7 +38,7 @@ class RouteDirective(Directive):
         super(RouteDirective, self).__init__(*args, **kwargs)
         self.env = self.state.document.settings.env
 
-    def get_routes(self, ini_file):
+    def get_routes(self, ini_file, undocumented=None):
         env = bootstrap(ini_file)
         registry = env['registry']
         config = Configurator(registry=registry)
@@ -53,8 +53,10 @@ class RouteDirective(Directive):
 
         for route in routes:
             route_data = get_route_data(route, registry)
-
             for name, pattern, view, method, docs in route_data:
+                if view in undocumented:
+                    continue
+
                 mapped_routes.append({
                     'name': name,
                     'pattern': pattern,
@@ -128,13 +130,20 @@ class RouteDirective(Directive):
 
     def run(self):
         ini_file = self.arguments[0]
-        routes = self.get_routes(ini_file)
         format = self.options.get('format', 'custom')
+        undocumented = self.options.get('undoc-endpoints', None)
+
+        if undocumented is not None:
+            undocumented = undocumented.split()
+
+        routes = self.get_routes(ini_file, undocumented)
 
         if format == 'custom':
             return self.make_custom_rst(routes)
-        else:
+        elif format == 'httpdomain':
             return self.make_httpdomain_rst(routes)
+        else:
+            raise Exception('Unsupported format %s' % format)
 
 
 def trim(docstring):

@@ -49,4 +49,21 @@ We also support using sphinxcontrib-httpdomain_ format, just use the
     .. autopyramid:: /path/to/development.ini
         :format: httpdomain
 
+Ignoring Endpoints
+----------------------
+If you have a set of endpoints that you don't want documented you can use
+``:undoc-endpoints:`` like this:
+
+.. code-block:: rst
+
+    Welcome to my Pyramid app's API docs
+    ====================================
+
+    These are the best APIs in the world!
+
+    .. autopyramid:: /path/to/development.ini
+        :undoc-endpoints:
+          myapp.v1.views.method_name
+          myapp.v2.views.other_name
+
 .. _sphinxcontrib-httpdomain: http://pythonhosted.org/sphinxcontrib-httpdomain/
