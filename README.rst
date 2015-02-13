@@ -31,8 +31,22 @@ directive and provide the path to your Pyramid's .ini file. Here is an example:
 
     These are the best APIs in the world!
 
-    .. pyramid-autodoc::
-       :ini: /path/to/development.ini
+    .. autopyramid:: /path/to/development.ini
 
 Then you can just run your ``sphinx-build`` command and it will autogenerate
 API documentation from your Pyramid routes and view docstrings.
+
+We also support using sphinxcontrib-httpdomain_ format, just use the
+``:format:`` setting:
+
+.. code-block:: rst
+
+    Welcome to my Pyramid app's API docs
+    ====================================
+
+    These are the best APIs in the world!
+
+    .. autopyramid:: /path/to/development.ini
+        :format: httpdomain
+
+.. _sphinxcontrib-httpdomain: http://pythonhosted.org/sphinxcontrib-httpdomain/

@@ -10,6 +10,10 @@ from pyramid.paster import bootstrap
 from pyramid.compat import PY3
 from pyramid.config import Configurator
 from pyramid_autodoc.utils import get_route_data
+from sphinxcontrib.autohttp.common import http_directive
+from sphinxcontrib import httpdomain
+from docutils.statemachine import ViewList
+from sphinx.util.nodes import nested_parse_with_titles
 
 
 class RouteDirective(Directive):
@@ -20,20 +24,21 @@ class RouteDirective(Directive):
 
     Usage, in a sphinx documentation::
 
-        .. pyramid-autodoc::
-            :ini: development.ini
+        .. pyramid-autodoc:: development.ini
+            :undoc-endpoints: ansvc.v1.views.get_rollups
     """
     has_content = True
-    option_spec = {'ini': directives.unchanged}
-    domain = 'pyramid'
-    doc_field_types = []
+    required_arguments = 1
+    option_spec = {
+        'undoc-endpoints': directives.unchanged,
+        'format': directives.unchanged,
+    }
 
     def __init__(self, *args, **kwargs):
         super(RouteDirective, self).__init__(*args, **kwargs)
         self.env = self.state.document.settings.env
 
-    def run(self):
-        ini_file = self.options.get('ini')
+    def get_routes(self, ini_file):
         env = bootstrap(ini_file)
         registry = env['registry']
         config = Configurator(registry=registry)
@@ -58,6 +63,28 @@ class RouteDirective(Directive):
                     'docs': trim(docs),
                 })
 
+        return mapped_routes
+
+    def make_httpdomain_rst(self, mapped_routes):
+        node = nodes.section()
+        node.document = self.state.document
+        result = ViewList()
+
+        for route in mapped_routes:
+            directives = http_directive(
+                route['method'],
+                route['pattern'],
+                route['docs'],
+            )
+
+            for line in directives:
+                result.append(line, '<autopyramid>')
+
+            nested_parse_with_titles(self.state, result, node)
+
+        return node.children
+
+    def make_custom_rst(self, mapped_routes):
         custom_nodes = []
 
         for mapped_route in mapped_routes:
@@ -98,6 +125,16 @@ class RouteDirective(Directive):
             custom_nodes.append(route_node)
 
         return custom_nodes
+
+    def run(self):
+        ini_file = self.arguments[0]
+        routes = self.get_routes(ini_file)
+        format = self.options.get('format', 'custom')
+
+        if format == 'custom':
+            return self.make_custom_rst(routes)
+        else:
+            return self.make_httpdomain_rst(routes)
 
 
 def trim(docstring):
@@ -164,4 +201,7 @@ def rst2node(doc_name, data):
 
 def setup(app):
     """Hook the directives when Sphinx ask for it."""
-    app.add_directive('pyramid-autodoc', RouteDirective)
+    if 'http' not in app.domains:
+        httpdomain.setup(app)
+
+    app.add_directive('autopyramid', RouteDirective)
