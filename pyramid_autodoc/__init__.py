@@ -54,7 +54,7 @@ class RouteDirective(Directive):
         for route in routes:
             route_data = get_route_data(route, registry)
             for name, pattern, view, method, docs in route_data:
-                if view in undocumented:
+                if undocumented is not None and view in undocumented:
                     continue
 
                 mapped_routes.append({
