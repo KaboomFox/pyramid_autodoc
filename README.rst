@@ -51,8 +51,13 @@ We also support using sphinxcontrib-httpdomain_ format, just use the
 
 Ignoring Endpoints
 ----------------------
-If you have a set of endpoints that you don't want documented you can use
-``:undoc-endpoints:`` like this:
+If you have a set of endpoints that you don't want to group or skip entirely
+there are a few options you can use:
+
+- ``:match-path:`` - Whitelist only a specific set of paths
+- ``:skip-path:`` - Blacklist a specific set of paths
+- ``:match-module:`` - Whitelist a set of modules
+- ``:skip-module:`` - Blacklist a set of modules
 
 .. code-block:: rst
 
@@ -62,8 +67,9 @@ If you have a set of endpoints that you don't want documented you can use
     These are the best APIs in the world!
 
     .. autopyramid:: /path/to/development.ini
-        :undoc-endpoints:
-          myapp.v1.views.method_name
-          myapp.v2.views.other_name
+        :skip-module:
+          ^myapp.v1.*
+        :match-path:
+          ^/data
 
 .. _sphinxcontrib-httpdomain: http://pythonhosted.org/sphinxcontrib-httpdomain/

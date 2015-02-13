@@ -14,6 +14,7 @@ from sphinxcontrib.autohttp.common import http_directive
 from sphinxcontrib import httpdomain
 from docutils.statemachine import ViewList
 from sphinx.util.nodes import nested_parse_with_titles
+import re
 
 
 class RouteDirective(Directive):
@@ -25,12 +26,16 @@ class RouteDirective(Directive):
     Usage, in a sphinx documentation::
 
         .. pyramid-autodoc:: development.ini
-            :undoc-endpoints: ansvc.v1.views.get_rollups
+            :skip: ^/status
+            :match: ^/v1
     """
     has_content = True
     required_arguments = 1
     option_spec = {
-        'undoc-endpoints': directives.unchanged,
+        'match-path': directives.unchanged,
+        'match-module': directives.unchanged,
+        'skip-path': directives.unchanged,
+        'match-module': directives.unchanged,
         'format': directives.unchanged,
     }
 
@@ -38,7 +43,16 @@ class RouteDirective(Directive):
         super(RouteDirective, self).__init__(*args, **kwargs)
         self.env = self.state.document.settings.env
 
-    def get_routes(self, ini_file, undocumented=None):
+    def matches_pattern(self, filters, value):
+        if filters is not None:
+            for path_filter in filters:
+                if re.match(path_filter, value):
+                    return True
+
+        return False
+
+    def get_routes(self, ini_file, path_blacklist=None, path_whitelist=None,
+                   module_blacklist=None, module_whitelist=None):
         env = bootstrap(ini_file)
         registry = env['registry']
         config = Configurator(registry=registry)
@@ -54,8 +68,21 @@ class RouteDirective(Directive):
         for route in routes:
             route_data = get_route_data(route, registry)
             for name, pattern, view, method, docs in route_data:
-                if undocumented is not None and view in undocumented:
-                    continue
+                if path_blacklist:
+                    if self.matches_pattern(path_blacklist, pattern):
+                        continue
+
+                if path_whitelist:
+                    if not self.matches_pattern(path_whitelist, pattern):
+                        continue
+
+                if module_blacklist:
+                    if self.matches_pattern(module_blacklist, view):
+                        continue
+
+                if module_whitelist:
+                    if not self.matches_pattern(module_whitelist, view):
+                        continue
 
                 mapped_routes.append({
                     'name': name,
@@ -130,20 +157,26 @@ class RouteDirective(Directive):
 
     def run(self):
         ini_file = self.arguments[0]
-        format = self.options.get('format', 'custom')
-        undocumented = self.options.get('undoc-endpoints', None)
+        fmt = self.options.get('format', 'custom')
+        path_blacklist = self.options.get('skip-path', '').split() or None
+        path_whitelist = self.options.get('match-path', '').split() or None
+        module_blacklist = self.options.get('skip-module', '').split() or None
+        module_whitelist = self.options.get('match-module', '').split() or None
 
-        if undocumented is not None:
-            undocumented = undocumented.split()
+        routes = self.get_routes(
+            ini_file,
+            path_blacklist=path_blacklist,
+            path_whitelist=path_whitelist,
+            module_blacklist=module_blacklist,
+            module_whitelist=module_whitelist,
+        )
 
-        routes = self.get_routes(ini_file, undocumented)
-
-        if format == 'custom':
+        if fmt == 'custom':
             return self.make_custom_rst(routes)
-        elif format == 'httpdomain':
+        elif fmt == 'httpdomain':
             return self.make_httpdomain_rst(routes)
         else:
-            raise Exception('Unsupported format %s' % format)
+            raise Exception('Unsupported format %s' % fmt)
 
 
 def trim(docstring):
