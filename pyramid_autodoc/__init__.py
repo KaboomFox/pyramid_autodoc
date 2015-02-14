@@ -9,7 +9,7 @@ from docutils.parsers.rst import Directive, directives
 from pyramid.paster import bootstrap
 from pyramid.compat import PY3
 from pyramid.config import Configurator
-from pyramid_autodoc.utils import get_route_data
+from pyramid_autodoc.utils import get_route_data, ANY_KEY
 from sphinxcontrib.autohttp.common import http_directive
 from sphinxcontrib import httpdomain
 from docutils.statemachine import ViewList
@@ -100,8 +100,13 @@ class RouteDirective(Directive):
         result = ViewList()
 
         for route in mapped_routes:
+            if route['method'] == ANY_KEY:
+                method = 'any'
+            else:
+                method = route['method']
+
             directives = http_directive(
-                route['method'],
+                method,
                 route['pattern'],
                 route['docs'],
             )
