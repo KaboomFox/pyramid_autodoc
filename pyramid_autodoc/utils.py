@@ -159,8 +159,13 @@ def get_route_data(route, registry):
             for view in view_intr:
                 request_method = view.get('request_methods')
 
+                if view.get('attr') is not None:
+                    view_callable = getattr(view['callable'], view['attr'])
+                    view_module, view_docs = _get_view_module(view_callable)
+
                 if request_method is not None:
                     view_callable = view['callable']
+
                     view_module, view_docs = _get_view_module(view_callable)
 
                     if view_module not in view_request_methods:

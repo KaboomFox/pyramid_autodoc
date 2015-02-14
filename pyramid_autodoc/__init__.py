@@ -9,7 +9,12 @@ from docutils.parsers.rst import Directive, directives
 from pyramid.paster import bootstrap
 from pyramid.compat import PY3
 from pyramid.config import Configurator
-from pyramid_autodoc.utils import get_route_data
+from pyramid_autodoc.utils import get_route_data, ANY_KEY
+from sphinxcontrib.autohttp.common import http_directive
+from sphinxcontrib import httpdomain
+from docutils.statemachine import ViewList
+from sphinx.util.nodes import nested_parse_with_titles
+import re
 
 
 class RouteDirective(Directive):
@@ -20,20 +25,34 @@ class RouteDirective(Directive):
 
     Usage, in a sphinx documentation::
 
-        .. pyramid-autodoc::
-            :ini: development.ini
+        .. pyramid-autodoc:: development.ini
+            :skip: ^/status
+            :match: ^/v1
     """
     has_content = True
-    option_spec = {'ini': directives.unchanged}
-    domain = 'pyramid'
-    doc_field_types = []
+    required_arguments = 1
+    option_spec = {
+        'match-path': directives.unchanged,
+        'match-module': directives.unchanged,
+        'skip-path': directives.unchanged,
+        'match-module': directives.unchanged,
+        'format': directives.unchanged,
+    }
 
     def __init__(self, *args, **kwargs):
         super(RouteDirective, self).__init__(*args, **kwargs)
         self.env = self.state.document.settings.env
 
-    def run(self):
-        ini_file = self.options.get('ini')
+    def matches_pattern(self, filters, value):
+        if filters is not None:
+            for path_filter in filters:
+                if re.match(path_filter, value):
+                    return True
+
+        return False
+
+    def get_routes(self, ini_file, path_blacklist=None, path_whitelist=None,
+                   module_blacklist=None, module_whitelist=None):
         env = bootstrap(ini_file)
         registry = env['registry']
         config = Configurator(registry=registry)
@@ -48,8 +67,23 @@ class RouteDirective(Directive):
 
         for route in routes:
             route_data = get_route_data(route, registry)
-
             for name, pattern, view, method, docs in route_data:
+                if path_blacklist:
+                    if self.matches_pattern(path_blacklist, pattern):
+                        continue
+
+                if path_whitelist:
+                    if not self.matches_pattern(path_whitelist, pattern):
+                        continue
+
+                if module_blacklist:
+                    if self.matches_pattern(module_blacklist, view):
+                        continue
+
+                if module_whitelist:
+                    if not self.matches_pattern(module_whitelist, view):
+                        continue
+
                 mapped_routes.append({
                     'name': name,
                     'pattern': pattern,
@@ -58,6 +92,33 @@ class RouteDirective(Directive):
                     'docs': trim(docs),
                 })
 
+        return mapped_routes
+
+    def make_httpdomain_rst(self, mapped_routes):
+        node = nodes.section()
+        node.document = self.state.document
+        result = ViewList()
+
+        for route in mapped_routes:
+            if route['method'] == ANY_KEY:
+                method = 'any'
+            else:
+                method = route['method']
+
+            directives = http_directive(
+                method,
+                route['pattern'],
+                route['docs'],
+            )
+
+            for line in directives:
+                result.append(line, '<autopyramid>')
+
+        nested_parse_with_titles(self.state, result, node)
+
+        return node.children
+
+    def make_custom_rst(self, mapped_routes):
         custom_nodes = []
 
         for mapped_route in mapped_routes:
@@ -98,6 +159,29 @@ class RouteDirective(Directive):
             custom_nodes.append(route_node)
 
         return custom_nodes
+
+    def run(self):
+        ini_file = self.arguments[0]
+        fmt = self.options.get('format', 'custom')
+        path_blacklist = self.options.get('skip-path', '').split() or None
+        path_whitelist = self.options.get('match-path', '').split() or None
+        module_blacklist = self.options.get('skip-module', '').split() or None
+        module_whitelist = self.options.get('match-module', '').split() or None
+
+        routes = self.get_routes(
+            ini_file,
+            path_blacklist=path_blacklist,
+            path_whitelist=path_whitelist,
+            module_blacklist=module_blacklist,
+            module_whitelist=module_whitelist,
+        )
+
+        if fmt == 'custom':
+            return self.make_custom_rst(routes)
+        elif fmt == 'httpdomain':
+            return self.make_httpdomain_rst(routes)
+        else:
+            raise Exception('Unsupported format %s' % fmt)
 
 
 def trim(docstring):
@@ -164,4 +248,7 @@ def rst2node(doc_name, data):
 
 def setup(app):
     """Hook the directives when Sphinx ask for it."""
-    app.add_directive('pyramid-autodoc', RouteDirective)
+    if 'http' not in app.domains:
+        httpdomain.setup(app)
+
+    app.add_directive('autopyramid', RouteDirective)
