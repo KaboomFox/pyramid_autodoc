@@ -8,11 +8,13 @@ from docutils import nodes
 from docutils.parsers.rst import Directive, directives
 from pyramid.paster import bootstrap
 from pyramid.compat import PY3
+from pyramid.compat import string_types
 from pyramid.config import Configurator
 from pyramid_autodoc.utils import get_route_data, ANY_KEY
 from sphinxcontrib.autohttp.common import http_directive
 from sphinxcontrib import httpdomain
 from docutils.statemachine import ViewList
+from sphinx import addnodes
 from sphinx.util.nodes import nested_parse_with_titles
 import re
 
@@ -37,6 +39,8 @@ class RouteDirective(Directive):
         'skip-path': directives.unchanged,
         'match-module': directives.unchanged,
         'format': directives.unchanged,
+        'link-code': directives.flag,
+        'link-code-pattern': directives.unchanged,
     }
 
     def __init__(self, *args, **kwargs):
@@ -67,7 +71,7 @@ class RouteDirective(Directive):
 
         for route in routes:
             route_data = get_route_data(route, registry)
-            for name, pattern, view, method, docs in route_data:
+            for name, pattern, view, method, docs, src in route_data:
                 if path_blacklist:
                     if self.matches_pattern(path_blacklist, pattern):
                         continue
@@ -90,6 +94,9 @@ class RouteDirective(Directive):
                     'view': view,
                     'method': method,
                     'docs': trim(docs),
+                    'view_module': src.get('module_name'),
+                    'view_callable': src.get('callable_name'),
+                    'source_lines': src.get('source_lines'),
                 })
 
         return mapped_routes
@@ -98,6 +105,8 @@ class RouteDirective(Directive):
         node = nodes.section()
         node.document = self.state.document
         result = ViewList()
+
+        routes = {}
 
         for route in mapped_routes:
             if route['method'] == ANY_KEY:
@@ -111,10 +120,37 @@ class RouteDirective(Directive):
                 route['docs'],
             )
 
+            routes[(method, route['pattern'])] = route
+
             for line in directives:
                 result.append(line, '<autopyramid>')
 
         nested_parse_with_titles(self.state, result, node)
+
+        for objnode in node.traverse(addnodes.desc):
+            if objnode.get('domain') != 'http':
+                continue
+
+            for signode in objnode:
+                if not isinstance(signode, addnodes.desc_signature):
+                    continue
+                method = signode.get('method')
+                path = signode.get('path')
+                mapped_route = routes.get((method, path))
+                if not method or not path or not mapped_route:
+                    continue
+
+                xref_node = self._make_view_source_xref(mapped_route)
+                if not xref_node:
+                    continue
+
+                xref_node += nodes.inline('', '[source]',
+                                          classes=['viewcode-link'])
+
+                source_node = addnodes.only(expr='html')
+                source_node += xref_node
+
+                signode += source_node
 
         return node.children
 
@@ -140,12 +176,23 @@ class RouteDirective(Directive):
             def get_row(*column_texts):
                 row = nodes.row('')
                 for text in column_texts:
-                    node = nodes.paragraph('', '', nodes.Text(text))
+                    if isinstance(text, string_types):
+                        text_node = nodes.Text(text)
+                    else:
+                        text_node = text
+
+                    node = nodes.paragraph('', '', text_node)
                     row += nodes.entry('', node)
 
                 return row
 
-            body += get_row('Module', mapped_route['view'])
+            view_node = self._make_view_source_xref(mapped_route)
+            if view_node:
+                view_node += nodes.Text(mapped_route['view'])
+            else:
+                view_node = mapped_route['view']
+
+            body += get_row('Module', view_node)
             body += get_row('Request Method', mapped_route['method'])
             body += get_row('Route Name', mapped_route['name'])
 
@@ -159,6 +206,40 @@ class RouteDirective(Directive):
             custom_nodes.append(route_node)
 
         return custom_nodes
+
+    def _make_view_source_xref(self, mapped_route):
+        if 'link-code' not in self.options or \
+                not mapped_route['view_callable'] or \
+                not mapped_route['view_module'] or \
+                not mapped_route['source_lines']:
+            return
+
+        env = self.state.document.settings.env
+        link_code_pattern = self.options.get('link-code-pattern')
+
+        if link_code_pattern:
+            filepath = mapped_route['view_module'].replace('.', '/') + '.py'
+            uri = link_code_pattern.format(
+                file=filepath,
+                lineno_start=mapped_route['source_lines'][0],
+                lineno_end=mapped_route['source_lines'][1],
+            )
+            xref_node = nodes.reference('', '', internal=False, refuri=uri)
+
+        else:
+            if 'sphinx.ext.viewcode' not in env.config.extensions:
+                return
+
+            source_page = (
+                '_modules/' + mapped_route['view_module'].replace('.', '/'))
+
+            xref_node = addnodes.pending_xref(
+                '', reftype='viewcode', refdomain='std', refexplicit=False,
+                reftarget=source_page,
+                refid=mapped_route['view_callable'],
+                refdoc=env.docname)
+
+        return xref_node
 
     def run(self):
         ini_file = self.arguments[0]

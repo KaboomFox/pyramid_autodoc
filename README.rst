@@ -72,4 +72,43 @@ there are a few options you can use:
         :match-path:
           ^/data
 
+Linking to Source Code
+----------------------
+
+If you want to link from the endpoint to the source code for the corresponding
+views and you are using sphinx.ext.viewcode_, you can generate links to the
+source code pages it generates.  Alternatively, if your source is on the web,
+you can generate external links instead.
+
+- ``:link-code:`` - Enable links from endpoints to source code.  Assumes
+  sphinx.ext.viewcode_ is being used unless ``link-code-pattern`` is specified.
+- ``:link-code-pattern:`` - Pattern URL for generating links to source code.
+  Tokens in the pattern are replaced by the following values.
+
+  - ``{file}`` is replaced by the file path, e.g. ``pyramid_autodoc/utils.py``.
+  - ``{lineno_start}`` is replaced by the beginning line number of the view, e.g.
+    ``17``.
+  - ``{lineno_end}`` is replaced by the end line number of the view, e.g.
+    ``22``.
+
+.. code-block:: rst
+
+    Welcome to my Pyramid app's API docs
+    ====================================
+
+    Links to source code within the docs.
+
+    .. autopyramid:: /path/to/development.ini
+        :link-code:
+
+    Links to source code on GitHub.
+
+    .. autopyramid:: /path/to/development.ini
+        :link-code:
+        :link-code-pattern: https://github.com/SurveyMonkey/pyramid_autodoc/blob/master/{file}#L{lineno_start}-L{lineno_end}
+
+In the last example, a generated link would look like
+``https://github.com/SurveyMonkey/pyramid_autodoc/blob/master/pyramid_autodoc/utils.py#L17-L22``.
+
 .. _sphinxcontrib-httpdomain: http://pythonhosted.org/sphinxcontrib-httpdomain/
+.. _sphinx.ext.viewcode: http://sphinx-doc.org/ext/viewcode.html

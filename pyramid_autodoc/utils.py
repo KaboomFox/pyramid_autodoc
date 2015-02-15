@@ -1,3 +1,5 @@
+import inspect
+from pyramid.compat import PY3
 from pyramid.static import static_view
 from pyramid.interfaces import (
     IRouteRequest,
@@ -62,6 +64,43 @@ def _get_request_methods(route_request_methods, view_request_methods):
         request_methods = ','.join(sorted(request_methods))
 
     return request_methods
+
+
+def _get_view_source(view_callable):
+    if not view_callable or not hasattr(view_callable, '__name__'):
+        return {}
+
+    view_module_name = view_callable.__module__
+    try:
+        if PY3:
+            view_class_name = view_callable.__self__.__class__.__name__
+        else:
+            view_class_name = view_callable.im_class.__name__
+
+        view_callable_name = '%s.%s' % (
+            view_class_name,
+            view_callable.__name__)
+    except:
+        view_callable_name = view_callable.__name__
+
+    try:
+        real_callable = view_callable.__wrapped__
+    except:
+        real_callable = view_callable
+
+    try:
+        source_lines = inspect.getsourcelines(real_callable)
+        source_lines = (
+            source_lines[1],
+            source_lines[1] + len(source_lines[0]) - 1)
+    except:
+        source_lines = None
+
+    return {
+        'module_name': view_module_name,
+        'callable_name': view_callable_name,
+        'source_lines': source_lines,
+    }
 
 
 def _get_view_module(view_callable):
@@ -141,6 +180,8 @@ def get_route_data(route, registry):
     except:
         return []
 
+    view_source = _get_view_source(view_callable)
+
     # Introspectables can be turned off, so there could be a chance
     # that we have no `route_intr` but we do have a route + callable
     if route_intr is None:
@@ -162,11 +203,13 @@ def get_route_data(route, registry):
                 if view.get('attr') is not None:
                     view_callable = getattr(view['callable'], view['attr'])
                     view_module, view_docs = _get_view_module(view_callable)
+                    view_source = _get_view_source(view_callable)
 
                 if request_method is not None:
                     view_callable = view['callable']
 
                     view_module, view_docs = _get_view_module(view_callable)
+                    view_source = _get_view_source(view_callable)
 
                     if view_module not in view_request_methods:
                         view_request_methods[view_module] = []
@@ -202,6 +245,7 @@ def get_route_data(route, registry):
             view_module,
             request_methods,
             view_docs,
+            view_source,
         ))
 
     return final_routes
