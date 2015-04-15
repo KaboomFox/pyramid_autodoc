@@ -145,7 +145,7 @@ def get_route_data(route, registry):
     # that we have no `route_intr` but we do have a route + callable
     if route_intr is None:
         view_request_methods[view_module] = []
-        view_request_methods_order.append(view_module)
+        view_request_methods_order.append((view_module, view_docs))
     else:
         if route_intr.get('static', False) is True:
             return [
@@ -170,7 +170,8 @@ def get_route_data(route, registry):
 
                     if view_module not in view_request_methods:
                         view_request_methods[view_module] = []
-                        view_request_methods_order.append(view_module)
+                        view_request_methods_order.append((view_module,
+                                                           view_docs))
 
                     if isinstance(request_method, string_types):
                         request_method = (request_method,)
@@ -181,15 +182,16 @@ def get_route_data(route, registry):
                 else:
                     if view_module not in view_request_methods:
                         view_request_methods[view_module] = []
-                        view_request_methods_order.append(view_module)
+                        view_request_methods_order.append((view_module,
+                                                           view_docs))
 
         else:
             view_request_methods[view_module] = []
-            view_request_methods_order.append(view_module)
+            view_request_methods_order.append((view_module, view_docs))
 
     final_routes = []
 
-    for view_module in view_request_methods_order:
+    for view_module, view_docs in view_request_methods_order:
         methods = view_request_methods[view_module]
         request_methods = _get_request_methods(
             route_request_methods,
