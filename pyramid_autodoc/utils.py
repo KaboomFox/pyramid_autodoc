@@ -22,6 +22,7 @@ def _get_pattern(route):
 
 
 def _get_request_methods(route_request_methods, view_request_methods):
+    import ipdb; ipdb.set_trace()
     excludes = set()
 
     if route_request_methods:
@@ -65,6 +66,7 @@ def _get_request_methods(route_request_methods, view_request_methods):
 
 
 def _get_view_module(view_callable):
+    import ipdb; ipdb.set_trace()
     if view_callable is None:
         return UNKNOWN_KEY, ''
 
@@ -108,6 +110,7 @@ def _get_view_module(view_callable):
 
 
 def get_route_data(route, registry):
+    import ipdb; ipdb.set_trace()
     pattern = _get_pattern(route)
 
     request_iface = registry.queryUtility(
